@@ -231,7 +231,7 @@ pipeline {
                         HEALTH_CHECK_FAILED=0
                         
                         # 1. API Model
-                        check_service "Model API" "http://localhost:8080/health" || HEALTH_CHECK_FAILED=1
+                        check_service "Model API" "http://localhost:9000/health" || HEALTH_CHECK_FAILED=1
                         
                         # 2. PostgreSQL (via pg_isready)
                         echo ""
