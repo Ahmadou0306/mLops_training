@@ -204,7 +204,32 @@ pipeline {
             }
         }
 
+        stage('📝 Ensure Config Files') {
+            steps {
+                echo '=== Vérification et préparation des configs ==='
+                sh '''
+                    echo "📍 Current dir: $(pwd)"
+                    echo "📍 WORKSPACE: ${WORKSPACE}"
+                    
+                    # Si prometheus.yml n'est pas là, le recréer
+                    if [ ! -f prometheus.yml ]; then
+                        echo "🔧 Création de prometheus.yml..."
+                        cat > prometheus.yml << 'EOF'
+global:
+  scrape_interval: 15s
 
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+EOF
+                    fi
+                    
+                    echo "✅ Fichiers de config prêts"
+                    ls -la prometheus.yml
+                    '''
+                }
+            }
         // ====================================================================
         // STAGE 6 : Lancement des Services avec Docker Compose
         // ====================================================================
@@ -225,6 +250,8 @@ pipeline {
                 '''
             }
         }
+
+
         
         // ====================================================================
         // STAGE 7 : Health Checks de Tous les Services
