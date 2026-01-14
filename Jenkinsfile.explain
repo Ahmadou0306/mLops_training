@@ -1,0 +1,426 @@
+// ============================================================================
+// JENKINSFILE COMMENTÉ EN DÉTAIL
+// Langage : Groovy (syntaxe Declarative Pipeline)
+// ============================================================================
+
+// 'pipeline' = Mot-clé de début obligatoire pour un pipeline déclaratif
+pipeline {
+    
+    // ========================================================================
+    // AGENT : Où le pipeline s'exécute
+    // ========================================================================
+    agent any
+    // 'any' = N'importe quel agent disponible (master ou worker)
+    // Alternatives :
+    //   agent { docker { image 'python:3.11' } }  → Lance tout dans un conteneur
+    //   agent { label 'linux' }                   → Agent avec le label 'linux'
+    //   agent none                                → Pas d'agent global, défini par stage
+    
+    
+    // ========================================================================
+    // ENVIRONMENT : Variables d'environnement globales
+    // ========================================================================
+    environment {
+        // Variables disponibles dans TOUS les stages
+        DOCKER_IMAGE = 'mlops-training'
+        // ${env.BUILD_NUMBER} = Variable Jenkins automatique (1, 2, 3...)
+        VERSION = "${env.BUILD_NUMBER}"
+        
+        // Exemple d'autres variables possibles :
+        // DATABASE_URL = 'postgresql://...'
+        // API_KEY = credentials('my-api-key')  → Récupère depuis Jenkins Credentials
+    }
+    
+    
+    // ========================================================================
+    // OPTIONS : Configuration du pipeline
+    // ========================================================================
+    options {
+        // Garder seulement les 10 derniers builds (économise de l'espace)
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        
+        // Si le pipeline prend plus de 30 minutes, l'arrêter automatiquement
+        timeout(time: 30, unit: 'MINUTES')
+        // Autres unités possibles : SECONDS, HOURS, DAYS
+        
+        // Ajouter un timestamp à chaque ligne de log
+        timestamps()
+        // Exemple de log : [2025-01-14 10:30:45] Building...
+        
+        // Autres options utiles :
+        // disableConcurrentBuilds()  → Empêche 2 builds simultanés
+        // skipDefaultCheckout()      → Ne pas faire checkout automatique
+        // retry(3)                   → Réessayer 3 fois en cas d'échec
+    }
+    
+    
+    // ========================================================================
+    // STAGES : Étapes du pipeline (c'est le cœur !)
+    // ========================================================================
+    stages {
+        
+        // ====================================================================
+        // STAGE 1 : Checkout (Récupération du code)
+        // ====================================================================
+        stage('📥 Checkout') {
+            // 'steps' = Actions à exécuter dans ce stage
+            steps {
+                // 'echo' = Afficher un message dans les logs
+                echo '=== Récupération du code depuis Git ==='
+                
+                // 'checkout scm' = Récupère le code depuis Git configuré dans le job
+                // scm = Source Code Management (Git, SVN, etc.)
+                checkout scm
+                
+                // 'script' = Permet d'utiliser du code Groovy (syntaxe scriptée)
+                script {
+                    // Exécuter une commande shell et capturer le résultat
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: "git rev-parse --short HEAD",  // Commande shell
+                        returnStdout: true                      // Retourner la sortie
+                    ).trim()  // Enlever les espaces/newlines
+                    
+                    // Maintenant env.GIT_COMMIT_SHORT = "a1b2c3d" (hash court du commit)
+                }
+                
+                // Afficher des infos avec interpolation de variables
+                echo "📌 Commit: ${env.GIT_COMMIT_SHORT}"
+                // ${env.BRANCH_NAME ?: 'main'} = Si BRANCH_NAME existe, l'afficher, sinon 'main'
+                echo "📌 Branch: ${env.BRANCH_NAME ?: 'main'}"
+                echo "📌 Build: #${env.BUILD_NUMBER}"
+            }
+        }
+        
+        
+        // ====================================================================
+        // STAGE 2 : Code Quality (Linting)
+        // ====================================================================
+        stage('🔍 Code Quality') {
+            steps {
+                echo '=== Analyse de la qualité du code ==='
+                
+                script {
+                    // Utiliser l'API Docker de Jenkins (plugin Docker Pipeline requis)
+                    // docker.image('...').inside { } = Lance un conteneur temporaire
+                    docker.image('python:3.11-slim').inside {
+                        // Tout ce qui est dans ce bloc s'exécute DANS le conteneur
+                        
+                        // 'sh' = Execute shell (comme bash)
+                        // Les ''' (triple quotes) permettent le multi-ligne
+                        sh '''
+                            # Installer les outils (dans le conteneur)
+                            pip install flake8 black --quiet
+                            
+                            echo "🔍 Linting avec flake8..."
+                            # || true = Ne pas échouer le build si flake8 trouve des erreurs
+                            flake8 . --max-line-length=120 --exclude=venv,__pycache__ || true
+                            
+                            echo "🎨 Vérification du formatage avec black..."
+                            # || echo = Afficher un warning au lieu d'échouer
+                            black --check . || echo "⚠️ Code pas formaté"
+                        '''
+                        
+                        // Une fois sorti du bloc, le conteneur est détruit (--rm auto)
+                    }
+                }
+            }
+        }
+        
+        
+        // ====================================================================
+        // STAGE 3 : Tests
+        // ====================================================================
+        stage('🧪 Tests') {
+            steps {
+                echo '=== Exécution des tests ==='
+                
+                script {
+                    // Nouveau conteneur Python pour les tests
+                    docker.image('python:3.11-slim').inside {
+                        sh '''
+                            # Installer les dépendances du projet
+                            pip install -r requirements.txt --quiet
+                            pip install pytest pytest-cov --quiet
+                            
+                            # Créer un dossier pour les rapports
+                            mkdir -p reports
+                            
+                            echo "🧪 Lancement des tests..."
+                            # pytest avec options :
+                            pytest test_app.py -v \
+                                --junitxml=reports/junit.xml \           # Format JUnit pour Jenkins
+                                --cov=. \                                # Couverture de code
+                                --cov-report=html \                      # Rapport HTML
+                                --cov-report=term-missing                # Afficher les lignes non testées
+                        '''
+                    }
+                }
+            }
+            
+            // 'post' = Actions à exécuter APRÈS le stage (succès ou échec)
+            post {
+                // 'always' = Toujours exécuter (même si échec)
+                always {
+                    // Publier les résultats des tests dans Jenkins
+                    // Jenkins va parser le XML et afficher les stats
+                    junit 'reports/junit.xml'
+                    
+                    // Publier le rapport HTML de couverture
+                    publishHTML([
+                        reportDir: 'htmlcov',           // Dossier contenant le rapport
+                        reportFiles: 'index.html',       // Page d'entrée
+                        reportName: 'Code Coverage',     // Nom dans Jenkins
+                        keepAll: true                    // Garder tous les rapports
+                    ])
+                }
+                
+                // Autres options post possibles :
+                // success { ... }  → Seulement si succès
+                // failure { ... }  → Seulement si échec
+            }
+        }
+        
+        
+        // ====================================================================
+        // STAGE 4 : Build Docker Image
+        // ====================================================================
+        stage('🐳 Build Docker Image') {
+            steps {
+                echo '=== Construction de l\'image Docker ==='
+                
+                script {
+                    // """ (double quotes) = Permet l'interpolation de variables
+                    // ''' (simple quotes) = Pas d'interpolation
+                    sh """
+                        # docker build avec plusieurs tags
+                        docker build \
+                            -t ${DOCKER_IMAGE}:${VERSION} \              # Tag avec numéro de build
+                            -t ${DOCKER_IMAGE}:latest \                  # Tag 'latest'
+                            --build-arg BUILD_DATE=\$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+                            --build-arg VCS_REF=${env.GIT_COMMIT_SHORT} \
+                            .
+                        
+                        # \$(date ...) = \$ échappe le $ pour éviter interpolation Groovy
+                        # On veut que date s'exécute dans le shell, pas dans Groovy
+                    """
+                    
+                    echo "✅ Image créée: ${DOCKER_IMAGE}:${VERSION}"
+                    
+                    // Lister les images Docker créées
+                    sh "docker images | grep ${DOCKER_IMAGE}"
+                }
+            }
+        }
+        
+        
+        // ====================================================================
+        // STAGE 5 : Security Scan (Optionnel)
+        // ====================================================================
+        stage('🔐 Security Scan') {
+            steps {
+                echo '=== Scan de sécurité de l\'image ==='
+                
+                script {
+                    sh """
+                        echo "🔍 Scan de vulnérabilités..."
+                        
+                        # Commenté pour l'instant (décommenter si Trivy installé)
+                        # Trivy = Scanner de vulnérabilités pour images Docker
+                        # docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                        #     aquasec/trivy:latest image \
+                        #     --severity HIGH,CRITICAL \
+                        #     ${DOCKER_IMAGE}:${VERSION}
+                        
+                        echo "✅ Scan terminé"
+                    """
+                }
+            }
+        }
+        
+        
+        // ====================================================================
+        // STAGE 6 : Validation (Test de l'image)
+        // ====================================================================
+        stage('✅ Validation') {
+            steps {
+                echo '=== Test de l\'image Docker ==='
+                
+                script {
+                    sh """
+                        echo "🚀 Lancement d'un conteneur de test..."
+                        
+                        # Lancer l'image créée en mode détaché
+                        docker run -d \
+                            --name test-${BUILD_NUMBER} \     # Nom unique par build
+                            -p 8888:8080 \                     # Port mapping
+                            ${DOCKER_IMAGE}:${VERSION}
+                        
+                        # Attendre que l'app démarre
+                        sleep 5
+                        
+                        # Faire un health check avec curl
+                        echo "🏥 Health check..."
+                        # -f = Fail si HTTP error (4xx, 5xx)
+                        # || exit 1 = Si curl échoue, arrêter le pipeline
+                        curl -f http://localhost:8888/health || exit 1
+                        
+                        echo "✅ Image validée !"
+                        
+                        # Nettoyer le conteneur de test
+                        docker stop test-${BUILD_NUMBER}
+                        docker rm test-${BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+        
+    } // Fin des stages
+    
+    
+    // ========================================================================
+    // POST : Actions finales (après TOUS les stages)
+    // ========================================================================
+    post {
+        // 'always' = Toujours exécuter (succès, échec, annulation)
+        always {
+            echo '=== Nettoyage ==='
+            
+            sh '''
+                # Nettoyer tous les conteneurs de test qui restent
+                # grep test- = Trouver les conteneurs avec "test-" dans le nom
+                # awk '{print $1}' = Extraire l'ID du conteneur
+                # xargs -r docker rm -f = Supprimer les conteneurs trouvés
+                # || true = Ne pas échouer si aucun conteneur trouvé
+                docker ps -a | grep test- | awk '{print $1}' | xargs -r docker rm -f || true
+                
+                # Nettoyer les images Docker intermédiaires (dangling)
+                docker image prune -f
+            '''
+            
+            // Nettoyer le workspace Jenkins (supprimer les fichiers du build)
+            cleanWs()
+        }
+        
+        // 'success' = Seulement si TOUT le pipeline a réussi
+        success {
+            echo '✅✅✅ PIPELINE RÉUSSI ! ✅✅✅'
+            echo "Image: ${DOCKER_IMAGE}:${VERSION}"
+            
+            // Ici vous pourriez :
+            // - Envoyer une notification Slack
+            // - Push vers Docker Hub
+            // - Déclencher un déploiement
+        }
+        
+        // 'failure' = Si AU MOINS UN stage a échoué
+        failure {
+            echo '❌❌❌ PIPELINE ÉCHOUÉ ! ❌❌❌'
+            
+            // Ici vous pourriez :
+            // - Envoyer un email d'alerte
+            // - Créer un ticket Jira
+            // - Notifier l'équipe sur Slack
+        }
+        
+        // 'unstable' = Tests ont échoué mais build ok
+        unstable {
+            echo '⚠️ Pipeline instable (tests partiellement échoués)'
+        }
+        
+        // Autres options post :
+        // changed { ... }    → Si le résultat a changé depuis le dernier build
+        // fixed { ... }      → Si le build était cassé et est maintenant réparé
+        // regression { ... } → Si le build était ok et est maintenant cassé
+        // aborted { ... }    → Si le build a été annulé manuellement
+    }
+    
+} // Fin du pipeline
+
+
+// ============================================================================
+// RÉSUMÉ DES CONCEPTS CLÉ
+// ============================================================================
+
+/*
+1. STRUCTURE DECLARATIVE :
+   pipeline { agent → environment → options → stages → post }
+
+2. VARIABLES JENKINS AUTOMATIQUES :
+   - ${env.BUILD_NUMBER}     → Numéro du build (1, 2, 3...)
+   - ${env.JOB_NAME}         → Nom du job
+   - ${env.WORKSPACE}        → Chemin du workspace
+   - ${env.BRANCH_NAME}      → Nom de la branche Git
+   - ${env.BUILD_URL}        → URL du build dans Jenkins
+
+3. SYNTAXE GROOVY :
+   - Simple quotes '''  → Pas d'interpolation
+   - Double quotes """  → Interpolation de variables ${...}
+   - script { }         → Bloc Groovy scripté
+   - sh 'commande'      → Exécuter du shell
+   - echo 'message'     → Afficher dans les logs
+
+4. DOCKER DANS JENKINS :
+   - docker.image('...').inside { }  → Lance un conteneur temporaire
+   - Équivalent à : docker run --rm -v $(pwd):/workspace -w /workspace ...
+
+5. POST ACTIONS :
+   - always    → Toujours
+   - success   → Si succès
+   - failure   → Si échec
+   - unstable  → Si tests échoués
+   - changed   → Si résultat différent du précédent
+*/
+
+
+// ============================================================================
+// EXEMPLES D'UTILISATION AVANCÉE
+// ============================================================================
+
+/*
+// Exemple 1 : Conditions avec 'when'
+stage('Deploy to Prod') {
+    when {
+        branch 'main'  // Seulement si branche main
+    }
+    steps {
+        sh './deploy.sh'
+    }
+}
+
+// Exemple 2 : Stages parallèles
+stage('Tests') {
+    parallel {
+        stage('Unit Tests') {
+            steps { sh 'pytest tests/unit' }
+        }
+        stage('E2E Tests') {
+            steps { sh 'pytest tests/e2e' }
+        }
+    }
+}
+
+// Exemple 3 : Approbation manuelle
+stage('Deploy') {
+    steps {
+        input message: 'Déployer ?', ok: 'Oui'
+        sh './deploy.sh'
+    }
+}
+
+// Exemple 4 : Credentials
+environment {
+    DOCKER_CREDS = credentials('dockerhub-credentials')
+    // Crée automatiquement :
+    // - DOCKER_CREDS_USR (username)
+    // - DOCKER_CREDS_PSW (password)
+}
+
+// Exemple 5 : Retry
+stage('Deploy') {
+    steps {
+        retry(3) {  // Réessayer 3 fois si échec
+            sh './deploy.sh'
+        }
+    }
+}
+*/
