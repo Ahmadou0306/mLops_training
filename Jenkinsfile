@@ -173,6 +173,27 @@ pipeline {
             }
         }
         
+        //Debug
+        stage('🔍 Debug Files') {
+            steps {
+                echo '=== Vérification des fichiers ==='
+                sh '''
+                    echo "📂 Contenu du workspace:"
+                    ls -la
+                    
+                    echo ""
+                    echo "📄 Fichiers de config:"
+                    ls -la prometheus.yml 2>/dev/null || echo "❌ prometheus.yml manquant"
+                    ls -la nginx.conf 2>/dev/null || echo "❌ nginx.conf manquant"
+                    ls -la docker-compose.yml || echo "❌ docker-compose.yml manquant"
+                    
+                    echo ""
+                    echo "📍 Répertoire courant:"
+                    pwd
+                '''
+            }
+        }
+                
         // ====================================================================
         // STAGE 6 : Lancement des Services avec Docker Compose
         // ====================================================================
