@@ -172,7 +172,39 @@ pipeline {
                 }
             }
         }
-         
+        stage('📝 Prepare Config Files') {
+            steps {
+                echo '=== Préparation des fichiers de configuration ==='
+                sh '''
+                    # Afficher le workspace actuel
+                    echo "📍 Workspace actuel: $(pwd)"
+                    
+                    # Copier prometheus.yml s'il n'existe pas
+                    if [ ! -f prometheus.yml ]; then
+                        echo "⚠️ prometheus.yml manquant, recherche dans workspace principal..."
+                        
+                        # Chercher dans le workspace parent
+                        if [ -f ../ml_project/prometheus.yml ]; then
+                            cp ../ml_project/prometheus.yml .
+                            echo "✅ prometheus.yml copié"
+                        fi
+                    fi
+                    
+                    # Copier nginx.conf s'il existe
+                    if [ ! -f nginx.conf ] && [ -f ../ml_project/nginx.conf ]; then
+                        cp ../ml_project/nginx.conf .
+                        echo "✅ nginx.conf copié"
+                    fi
+                    
+                    # Vérifier les fichiers
+                    echo ""
+                    echo "📄 Fichiers disponibles:"
+                    ls -la *.yml *.conf 2>/dev/null || true
+                '''
+            }
+        }
+
+
         // ====================================================================
         // STAGE 6 : Lancement des Services avec Docker Compose
         // ====================================================================
