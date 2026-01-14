@@ -7,7 +7,9 @@ pipeline {
     agent {
         docker {
             image 'ahmadou030602/python-docker' //image custom pour avoir docker et python
-            args '-v /var/run/docker.sock:/var/run/docker.sock' //permet d'exécuter les commandes docker-socket hérité du master
+            args '-v /var/run/docker.sock:/var/run/docker.sock --network host' 
+            ///var/run/docker.sock:/var/run/docker.sock permet d'exécuter les commandes docker-socket hérité du master
+            //Le --network host permet au conteneur Jenkins d'accéder directement au localhost de l'hôte.
             reuseNode true
         }
     }
