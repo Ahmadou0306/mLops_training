@@ -71,13 +71,12 @@ services:
     networks:
       - mlops-network
     depends_on:
-      - prometheus
+      - mlflow-server
     restart: unless-stopped
 
 volumes:
   postgres-data:
   mlflow-data:
-  prometheus-data:
   grafana-data:
 
 networks:
