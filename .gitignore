@@ -1,4 +1,4 @@
-models/*
+models/*.pkl
 app-logs/*
 __pycache__
 venv
