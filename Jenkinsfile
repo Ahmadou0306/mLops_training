@@ -29,7 +29,6 @@ pipeline {
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
         timeout(time: 45, unit: 'MINUTES')  // Plus de temps pour docker-compose
-        timestamps()
     }
     
     triggers {
@@ -71,7 +70,7 @@ pipeline {
         // ====================================================================
         // STAGE 2 : Code Quality (dans un conteneur isolé)
         // ====================================================================
-        stage('🔍 Code Quality') {
+        stage('Code Quality') {
             steps {
                 echo '=== Analyse de la qualité du code ==='
                 script {
@@ -95,7 +94,7 @@ pipeline {
         // ====================================================================
         // STAGE 3 : Tests Unitaires (avant de builder les services)
         // ====================================================================
-        stage('🧪 Tests Unitaires') {
+        stage('Tests Unitaires') {
             steps {
                 echo '=== Exécution des tests unitaires ==='
                 script {
@@ -121,10 +120,13 @@ pipeline {
                 always {
                     junit 'reports/junit.xml'
                     publishHTML([
+                        allowMissing: false,              
+                        alwaysLinkToLastBuild: true,      
+                        keepAll: true,
                         reportDir: 'htmlcov',
                         reportFiles: 'index.html',
                         reportName: 'Code Coverage',
-                        keepAll: true
+                        reportTitles: ''
                     ])
                 }
             }
@@ -151,7 +153,7 @@ pipeline {
         // ====================================================================
         // STAGE 5 : Build de l'Image Docker de l'API
         // ====================================================================
-        stage('🐳 Build Docker Image') {
+        stage('Build Docker Image') {
             steps {
                 echo '=== Construction de l\'image Docker de l\'API ==='
                 script {
@@ -195,7 +197,7 @@ pipeline {
         // ====================================================================
         // STAGE 7 : Health Checks de Tous les Services
         // ====================================================================
-        stage('🏥 Health Checks') {
+        stage('Health Checks') {
             steps {
                 echo '=== Vérification de la santé des services ==='
                 script {
@@ -272,7 +274,7 @@ pipeline {
         // ====================================================================
         // STAGE 8 : Tests d'Intégration (API + Services)
         // ====================================================================
-        stage('🧪 Tests d\'Intégration') {
+        stage('Tests d\'Intégration') {
             steps {
                 echo '=== Tests d\'intégration de la stack complète ==='
                 script {
@@ -339,7 +341,7 @@ pipeline {
         // ====================================================================
         // STAGE 9 : Performance / Load Test (Optionnel)
         // ====================================================================
-        stage('⚡ Load Test') {
+        stage('Load Test') {
             when {
                 branch 'main'  // Seulement sur la branche main
             }
@@ -370,7 +372,7 @@ pipeline {
         // ====================================================================
         // STAGE 10 : Collecte des Logs et Métriques
         // ====================================================================
-        stage('📊 Collect Metrics') {
+        stage('Collect Metrics') {
             steps {
                 echo '=== Collecte des logs et métriques ==='
                 sh '''
@@ -395,7 +397,7 @@ pipeline {
         // ====================================================================
         // STAGE 11 : Décision de Déploiement (Manuel pour Production)
         // ====================================================================
-        stage('🚢 Deploy Decision') {
+        stage('Deploy Decision') {
             when {
                 branch 'main'
             }
