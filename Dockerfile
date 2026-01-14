@@ -26,4 +26,4 @@ USER mluser
 EXPOSE 9000
 
 # Utiliser gunicorn en production
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:9000", "--workers", "2", "app:app"]
