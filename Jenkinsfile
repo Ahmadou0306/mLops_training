@@ -1,5 +1,5 @@
 // ============================================================================
-// JENKINSFILE POUR PROJET AVEC DOCKER-COMPOSE
+// JENKINSFILE POUR PROJET AVEC docker compose
 // Infrastructure MLOps complète : API + PostgreSQL + MLflow + Monitoring
 // ============================================================================
 
@@ -28,7 +28,7 @@ pipeline {
     
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 45, unit: 'MINUTES')  // Plus de temps pour docker-compose
+        timeout(time: 45, unit: 'MINUTES')  // Plus de temps pour docker compose
     }
     
     triggers {
@@ -56,13 +56,13 @@ pipeline {
                 echo "📌 Commit: ${env.GIT_COMMIT_SHORT}"
                 echo "📌 Build: #${env.BUILD_NUMBER}"
                 
-                // Vérifier que docker-compose.yml existe
+                // Vérifier que docker compose.yml existe
                 sh '''
-                    if [ ! -f docker-compose.yml ]; then
-                        echo "❌ docker-compose.yml introuvable !"
+                    if [ ! -f docker compose.yml ]; then
+                        echo "❌ docker compose.yml introuvable !"
                         exit 1
                     fi
-                    echo "✅ docker-compose.yml trouvé"
+                    echo "✅ docker compose.yml trouvé"
                 '''
             }
         }
@@ -140,7 +140,7 @@ pipeline {
                 echo '=== Nettoyage des services existants ==='
                 sh '''
                     echo "🛑 Arrêt des services existants..."
-                    docker-compose down
+                    docker compose down
                     
                     echo "🗑️ Nettoyage des anciennes images..."
                     docker image prune -f || true
@@ -183,13 +183,13 @@ pipeline {
                     echo "🚀 Lancement de tous les services..."
                     
                     # Lancer en mode détaché
-                    docker-compose up -d
+                    docker compose up -d
                     
                     echo "⏳ Attente du démarrage des services (30s)..."
                     sleep 30
                     
                     echo "📊 État des services:"
-                    docker-compose ps
+                    docker compose ps
                 '''
             }
         }
@@ -239,7 +239,7 @@ pipeline {
                         # 2. PostgreSQL (via pg_isready)
                         echo ""
                         echo "📡 Test de PostgreSQL"
-                        if docker-compose exec -T postgres pg_isready -U admin > /dev/null 2>&1; then
+                        if docker compose exec -T postgres pg_isready -U admin > /dev/null 2>&1; then
                             echo "✅ PostgreSQL est UP"
                         else
                             echo "❌ PostgreSQL n'est pas disponible"
@@ -262,7 +262,7 @@ pipeline {
                         else
                             echo "❌ Certains services ont échoué"
                             echo "📋 Logs des services:"
-                            docker-compose logs --tail=50
+                            docker compose logs --tail=50
                             exit 1
                         fi
                         echo "==================================="
@@ -324,7 +324,7 @@ pipeline {
                         # Test 4 : Base de données PostgreSQL
                         echo ""
                         echo "📝 Test 4: PostgreSQL connectivity"
-                        if docker-compose exec -T postgres psql -U admin -d mlflow -c "SELECT 1;" > /dev/null 2>&1; then
+                        if docker compose exec -T postgres psql -U admin -d mlflow -c "SELECT 1;" > /dev/null 2>&1; then
                             echo "✅ PostgreSQL accepte les connexions"
                         else
                             echo "❌ PostgreSQL connexion échouée"
@@ -383,13 +383,13 @@ pipeline {
                     echo "📋 Logs récents de chaque service:"
                     
                     echo "--- Model API ---"
-                    docker-compose logs --tail=20 model-api
+                    docker compose logs --tail=20 model-api
                     
                     echo "--- MLflow ---"
-                    docker-compose logs --tail=20 mlflow
+                    docker compose logs --tail=20 mlflow
                     
                     echo "--- PostgreSQL ---"
-                    docker-compose logs --tail=10 postgres
+                    docker compose logs --tail=10 postgres
                 '''
             }
         }
@@ -420,7 +420,7 @@ pipeline {
                     
                     if (userInput == 'Stop Services') {
                         echo "🛑 Arrêt des services..."
-                        sh 'docker-compose down'
+                        sh 'docker compose down'
                     } else if (userInput == 'Tag for Production') {
                         echo "🏷️ Tagging pour production..."
                         sh """
@@ -444,7 +444,7 @@ pipeline {
             script {
                 sh '''
                     echo "📊 État final des services:"
-                    docker-compose ps || echo "Services arrêtés"
+                    docker compose ps || echo "Services arrêtés"
                     
                     echo ""
                     echo "🐳 Images Docker créées:"
@@ -475,15 +475,15 @@ pipeline {
             
             sh '''
                 echo "📋 Logs des services en erreur:"
-                docker-compose logs --tail=100 || echo "Pas de logs disponibles"
+                docker compose logs --tail=100 || echo "Pas de logs disponibles"
                 
                 echo ""
                 echo "🐳 État des conteneurs:"
-                docker-compose ps -a || echo "Aucun conteneur"
+                docker compose ps -a || echo "Aucun conteneur"
             '''
             
             // Nettoyer en cas d'échec
-            sh 'docker-compose down --volumes || true'
+            sh 'docker compose down --volumes || true'
         }
         
         unstable {
