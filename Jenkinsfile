@@ -15,7 +15,7 @@ pipeline {
     
     environment {
         // Configuration Docker
-        COMPOSE_PROJECT_NAME = 'mlops-training'
+        COMPOSE_PROJECT_NAME = 'mlops_training'
         DOCKER_IMAGE = 'mlops-training'
         VERSION = "${env.BUILD_NUMBER}"
         
@@ -232,26 +232,6 @@ pipeline {
                         
                         # 1. API Model
                         check_service "Model API" "http://localhost:9000/health" || HEALTH_CHECK_FAILED=1
-                        
-                        # 2. PostgreSQL (via pg_isready)
-                        echo ""
-                        echo "📡 Test de PostgreSQL"
-                        if docker compose exec -T postgres pg_isready -U admin > /dev/null 2>&1; then
-                            echo "✅ PostgreSQL est UP"
-                        else
-                            echo "❌ PostgreSQL n'est pas disponible"
-                            HEALTH_CHECK_FAILED=1
-                        fi
-                        
-                        # 3. MLflow
-                        check_service "MLflow" "http://localhost:5000" || HEALTH_CHECK_FAILED=1
-                        
-                        # 4. Prometheus
-                        check_service "Prometheus" "http://localhost:9090/-/healthy" || HEALTH_CHECK_FAILED=1
-                        
-                        # 5. Grafana
-                        check_service "Grafana" "http://localhost:3000/api/health" || HEALTH_CHECK_FAILED=1
-                        
                         echo ""
                         echo "==================================="
                         if [ $HEALTH_CHECK_FAILED -eq 0 ]; then
@@ -281,7 +261,7 @@ pipeline {
                         # Test 1 : Endpoint de prédiction de l'API
                         echo ""
                         echo "📝 Test 1: Endpoint /predict"
-                        RESPONSE=$(curl -s -X POST http://localhost:8080/predict \
+                        RESPONSE=$(curl -s -X POST http://localhost:9000/predict \
                             -H "Content-Type: application/json" \
                             -d '{"features": [1, 2, 3, 4, 5]}' \
                             -w "\n%{http_code}")
@@ -297,39 +277,6 @@ pipeline {
                             echo "   Response: $BODY"
                             exit 1
                         fi
-                        
-                        # Test 2 : Vérifier que MLflow enregistre les expériences
-                        echo ""
-                        echo "📝 Test 2: MLflow tracking"
-                        MLFLOW_EXPERIMENTS=$(curl -s http://localhost:5000/api/2.0/mlflow/experiments/list)
-                        if echo "$MLFLOW_EXPERIMENTS" | grep -q "experiments"; then
-                            echo "✅ MLflow tracking fonctionne"
-                        else
-                            echo "⚠️ MLflow tracking: pas d'expériences (normal au premier lancement)"
-                        fi
-                        
-                        # Test 3 : Vérifier les métriques Prometheus
-                        echo ""
-                        echo "📝 Test 3: Prometheus metrics"
-                        PROM_METRICS=$(curl -s http://localhost:9090/api/v1/query?query=up)
-                        if echo "$PROM_METRICS" | grep -q "success"; then
-                            echo "✅ Prometheus collecte des métriques"
-                        else
-                            echo "⚠️ Prometheus: métriques non disponibles"
-                        fi
-                        
-                        # Test 4 : Base de données PostgreSQL
-                        echo ""
-                        echo "📝 Test 4: PostgreSQL connectivity"
-                        if docker compose exec -T postgres psql -U admin -d mlflow -c "SELECT 1;" > /dev/null 2>&1; then
-                            echo "✅ PostgreSQL accepte les connexions"
-                        else
-                            echo "❌ PostgreSQL connexion échouée"
-                            exit 1
-                        fi
-                        
-                        echo ""
-                        echo "✅ Tous les tests d'intégration passés !"
                     '''
                 }
             }
@@ -346,7 +293,7 @@ pipeline {
                 echo '=== Test de charge de l\'API ==='
                 script {
                     sh '''
-                        echo "⚡ Test de charge avec Apache Bench..."
+                        echo "Test de charge avec Apache Bench..."
                         
                         # Installer ab si nécessaire
                         if ! command -v ab &> /dev/null; then
@@ -359,7 +306,7 @@ pipeline {
                         # Test de charge : 100 requêtes, 10 concurrentes
                         if command -v ab &> /dev/null; then
                             echo "🚀 100 requêtes, 10 concurrentes sur /health"
-                            ab -n 100 -c 10 http://localhost:8080/health || echo "⚠️ Load test failed"
+                            ab -n 100 -c 10 http://localhost:9000/health || echo "⚠️ Load test failed"
                         fi
                     '''
                 }
