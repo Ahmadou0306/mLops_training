@@ -6,7 +6,8 @@
 pipeline {
     agent {
         docker {
-            image 'node:18-alpine'
+            image 'ahmadou030602/python-docker' //image custom pour avoir docker et python
+            args '-v /var/run/docker.sock:/var/run/docker.sock' //permet d'exécuter les commandes docker-socket hérité du master
             reuseNode true
         }
     }
@@ -41,7 +42,7 @@ pipeline {
         // ====================================================================
         // STAGE 1 : Checkout et Préparation
         // ====================================================================
-        stage('📥 Checkout') {
+        stage('Checkout') {
             steps {
                 echo '=== Récupération du code depuis Git ==='
                 checkout scm
@@ -132,7 +133,7 @@ pipeline {
         // ====================================================================
         // STAGE 4 : Nettoyage des Services Existants
         // ====================================================================
-        stage('🧹 Cleanup') {
+        stage('Cleanup') {
             steps {
                 echo '=== Nettoyage des services existants ==='
                 sh '''
@@ -173,7 +174,7 @@ pipeline {
         // ====================================================================
         // STAGE 6 : Lancement des Services avec Docker Compose
         // ====================================================================
-        stage('🚀 Start Services') {
+        stage('Start Services') {
             steps {
                 echo '=== Démarrage des services Docker Compose ==='
                 sh '''
@@ -501,59 +502,3 @@ pipeline {
         }
     }
 }
-
-
-// ============================================================================
-// NOTES D'UTILISATION
-// ============================================================================
-
-/*
-📋 PRÉREQUIS:
-1. Docker et Docker Compose installés sur l'agent Jenkins
-2. Ports disponibles: 8080, 5000, 3000, 9090, 5432
-3. Fichiers requis dans le repo:
-   - docker-compose.yml
-   - Dockerfile
-   - requirements.txt
-   - test_app.py
-   - prometheus.yml (pour Prometheus)
-
-🔧 CONFIGURATION JENKINS:
-1. Créer le job Pipeline
-2. Configure → Pipeline → Pipeline script from SCM
-3. Repository: votre repo Git
-4. Script Path: Jenkinsfile
-
-🚀 WORKFLOW:
-1. Push vers Git → Jenkins détecte
-2. Tests unitaires dans un conteneur isolé
-3. Build de l'image Docker
-4. Lancement de toute la stack avec docker-compose
-5. Health checks de tous les services
-6. Tests d'intégration
-7. Décision manuelle de déploiement
-
-⚙️ VARIABLES À PERSONNALISER:
-- COMPOSE_PROJECT_NAME: nom de votre projet
-- Ports des services (si conflits)
-- Timeouts des health checks
-
-🔐 SÉCURITÉ:
-En production, stockez les credentials dans Jenkins:
-- PostgreSQL password
-- Grafana admin password
-- API tokens
-Utilisez credentials() dans environment{}
-
-📊 MONITORING:
-Accédez aux dashboards:
-- Grafana: http://localhost:3000 (admin/admin)
-- Prometheus: http://localhost:9090
-- MLflow: http://localhost:5000
-
-🛑 ARRÊT MANUEL:
-docker-compose down --volumes
-
-💾 BACKUP:
-docker-compose exec postgres pg_dump -U admin mlflow > backup.sql
-*/
