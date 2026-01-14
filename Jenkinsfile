@@ -74,9 +74,9 @@ pipeline {
             steps {
                 echo '=== Analyse de la qualité du code ==='
                 script {
-                    docker.image('python:3.11-slim').inside {
+                    docker.image('ahmadou030602/python-docker').inside {
+//                            pip install flake8 black --quiet
                         sh '''
-                            pip install flake8 black --quiet
                             
                             echo "🔍 Linting avec flake8..."
                             flake8 . --max-line-length=120 \
@@ -98,13 +98,9 @@ pipeline {
             steps {
                 echo '=== Exécution des tests unitaires ==='
                 script {
-                    docker.image('python:3.11-slim').inside {
-                        sh '''
-                            pip install -r requirements.txt --quiet
-                            pip install pytest pytest-cov --quiet
-                            
+                    docker.image('ahmadou030602/python-docker').inside { //On aurait pu utiliser une image plus léegere pré buildé
+                        sh '''                           
                             mkdir -p reports
-                            
                             echo "🧪 Tests unitaires..."
                             pytest test_app.py -v \
                                 --junitxml=reports/junit.xml \
@@ -203,7 +199,7 @@ pipeline {
                 '''
             }
         }
-        
+
         // ====================================================================
         // STAGE 6 : Lancement des Services avec Docker Compose
         // ====================================================================

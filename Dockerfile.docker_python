@@ -33,6 +33,10 @@ RUN pip install --no-cache-dir \
     pytest-cov \
     flake8 \
     black \
-    pylint
+    pylint \
+    pytest \
+    pytest-cov \
+    flake8 \ 
+    black 
 
 WORKDIR /workspace
