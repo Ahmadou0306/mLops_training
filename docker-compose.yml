@@ -4,7 +4,7 @@ services:
     build: .
     container_name: model-api
     ports:
-      - "8080:8080"
+      - "9000:9000"
     environment:
       - MODEL_PATH=/models/model.pkl
     volumes:

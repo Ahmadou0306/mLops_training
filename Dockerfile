@@ -23,7 +23,7 @@ RUN useradd -m -u 1000 mluser && \
     chown -R mluser:mluser /app
 USER mluser
 
-EXPOSE 8080
+EXPOSE 9000
 
 # Utiliser gunicorn en production
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "app:app"]
