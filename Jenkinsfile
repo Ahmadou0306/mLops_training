@@ -20,7 +20,7 @@ pipeline {
         VERSION = "${env.BUILD_NUMBER}"
         
         // Configuration des services
-        API_PORT = '8080'
+        API_PORT = '9000'
         MLFLOW_PORT = '5000'
         GRAFANA_PORT = '3000'
         PROMETHEUS_PORT = '9090'
